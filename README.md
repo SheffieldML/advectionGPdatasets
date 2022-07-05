@@ -2,4 +2,6 @@
 Access and manipulation of datasets for the advectionGP model.
 
 # Installation
-pip in
+```pip install git+https://github.com/SheffieldML/advectionGPdatasets.git```
+
+
