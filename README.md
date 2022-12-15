@@ -9,4 +9,9 @@ Access and manipulation of datasets for the advectionGP model.
 
 ```pip install -e advectionGPdatasets```
 
+# Note on installing on AWS instance
 
+```
+wget https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
+bash Anaconda3-2022.10-Linux-x86_64.sh
+```

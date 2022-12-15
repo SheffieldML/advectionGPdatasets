@@ -25,16 +25,16 @@ class ModelSample():
 
         sensors = FixedSensorModel(X,0.1) # establish sensor model arguments are sensor locations and spatial averaging
 
-        k_0 = 0.001 #Diffusion
+        k_0 = 0.01 #Diffusion
         R=0
         noiseSD = 0.05 #Observation noise
         
         boundary = ([0,0,0],[10,10,10])# corners of the grid - in units of space
         k = EQ(ls, 2.0) # generate EQ kernel arguments are lengthscale and variance
-        res = [200,80,80] # grid size for time, x and y
+        res = [500,150,150] # grid size for time, x and y
         Nsamps = 1
-        u1 = 0.2
-        u2 = 0.2
+        u1 = 0.4
+        u2 = 0.4
         windmodel=WindSimple(u1,u2) # establish fixed wind model
         m = PDEModel(resolution=res,boundary=boundary,N_feat=N_feat,noiseSD=noiseSD,kernel=k,sensormodel=sensors,windmodel=windmodel,k_0=k_0,R=0)
         
