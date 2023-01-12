@@ -152,3 +152,115 @@ class RoundHill:
     
     def info(self):
         return
+        
+from advectionGPdatasets import proposeboundary
+from advectionGP.kernels import EQ
+from advectionGP.sensors import FixedSensorModel
+from advectionGP.wind import WindSimple
+from advectionGP.models.mfmodels import MeshFreeAdjointAdvectionDiffusionModel as Model
+        
+class RoundHillModel():
+    def __init__(self,N_feat=1000,Nparticles=10,k=None,res = [100,60,70],noiseSD=0.01,k_0=1):
+        """
+        This class encapsulates the modelling of the roundhill dataset.
+        """
+        self.rh = RoundHill()
+        self.X = self.rh.experiments[0].X
+        self.Y = self.rh.experiments[0].Y #scaling
+        self.boundary = proposeboundary(self.X)
+        self.boundary[0][2]=-30 #puts the source on the grid!
+        self.boundary[0][0]=-120 #add two minutes to start
+        dist = np.round(self.X[:,2]**2+self.X[:,3]**2).astype(int)
+        self.keep = dist==10000 #2500, 10000, 40000
+        self.Xtest = self.X[self.keep,:]
+        self.Ytest = self.Y[self.keep]
+        self.X = self.X[~self.keep,:]
+        self.Y = self.Y[~self.keep]
+        self.N_feat = N_feat
+        self.Nparticles = Nparticles
+        if k is None:
+            self.k = EQ(np.array([200,9,9]), 200)
+        else:
+            self.k = k
+        self.res = res
+        self.noiseSD = noiseSD
+        self.sensors = FixedSensorModel(self.X,3)
+        self.windmodel=WindSimple(self.rh.experiments[0].windX,self.rh.experiments[0].windY)
+        self.k_0 = k_0
+        
+        
+        self.mInfer = Model(resolution=self.res,boundary=self.boundary,N_feat=self.N_feat,
+                       noiseSD=self.noiseSD,kernel=self.k,sensormodel=self.sensors,
+                       windmodel=self.windmodel,k_0=self.k_0) 
+
+    def compute(self,Nsamps=1,scaleby=[8,1,1]):
+        """
+        Compute using the specified model using:
+            Nsamps = number of samples [default 1 == the mean of Zs]
+            scaleby = the downscaled resolution of the concentration matrix returned [default [8,1,1]]
+        Returns a dictionary of:
+                sources,
+                conc (Concentration),
+                testconc (Concentration at test observations).
+            Each dictionary contains another dictionary of the:
+                mean - of samples
+                var - of samples
+                all - the raw samples
+        """
+        self.mInfer.computeModelRegressors(Nparticles=self.Nparticles) # Compute regressor matrix
+        meanZ, covZ = self.mInfer.computeZDistribution(self.Y)
+
+        if Nsamps==1:
+            Zs = meanZ[None,:]
+        else:
+            Zs = np.random.multivariate_normal(meanZ,covZ,Nsamps)
+   
+        #Compute source grid
+        coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2]].transpose([1,2,3,0])
+        sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z) for z in Zs])
+        sourcesmean = np.mean(sources,0)
+        sourcesvar = np.var(sources,0)
+
+        #compute concentration grid
+        concmean,concvar,concentrations = self.mInfer.computeConcentration(Nparticles=self.Nparticles,
+                                                                           Zs=Zs,interpolateSource=True,
+                                                                           coords=coords)
+
+        #Compute concentrations at test points
+        self.gridsource = self.mInfer.getGridCoord(np.array([0,0,0])) #location of ground truth source
+        self.gridX = self.mInfer.getGridCoord(self.X[:,1:])/np.array(scaleby) #grid-coords of X (inputs)
+        self.mInferCoords = self.mInfer.coords
+        self.testsensors = FixedSensorModel(self.Xtest,3)
+        particles = self.mInfer.genParticlesFromObservations(50,self.testsensors)
+        meantestconc,vartestconc,testconc = self.mInfer.computeConcentration(
+                    particles=particles,Zs=Zs,interpolateSource=True)
+        self.Zs = Zs
+        self.results = {'sources':{'mean':sourcesmean,'var':sourcesvar,'all':sources},
+                'conc':{'mean':concmean,'var':concvar,'all':concentrations},
+                'testconc':{'mean':meantestconc,'var':vartestconc,'all':testconc}}
+        return self.results
+
+    def scatter_plot_test(self,preds=None):
+        keep = self.Xtest[:,1]>=0
+        if preds is None:
+            preds = self.results['testconc']['mean'].copy()
+            preds[preds<0]=0
+        plt.plot(self.Ytest[keep],preds[keep],'x')
+        plt.grid()
+        plt.xlabel('True')
+        plt.ylabel('Pred')
+        
+    def plot_test(self,preds = None,timepoint=600):
+        Xtest = self.Xtest
+        Ytest = self.Ytest
+        keep = Xtest[:,1]==timepoint
+        if preds is None:
+            preds = self.results['testconc']['mean'].copy()
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],Ytest[keep],c='green',alpha=0.5,label='true')
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],preds[keep],alpha=1,c='none',edgecolors='k',label='pred')
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],-preds[keep],alpha=0.2,c='none',edgecolors='b',label='pred')
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],1,c='k')
+        plt.scatter(self.X[:,2],self.X[:,3],1+self.Y/20,c='k')
+        plt.plot([0],[0],'o')
+        plt.axis('equal')
+        plt.legend()                

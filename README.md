@@ -14,4 +14,9 @@ Access and manipulation of datasets for the advectionGP model.
 ```
 wget https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
 bash Anaconda3-2022.10-Linux-x86_64.sh
+
+conda install qpsolvers -c conda-forge
+pip install git+https://github.com/SheffieldML/advectionGPdatasets.git
+pip install git+https://github.com/SheffieldML/advectionGP.git
+pip install git+https://github.com/lionfish0/truncatedMVN.git
 ```
