@@ -210,6 +210,8 @@ class RoundHillModel():
         self.mInfer.computeModelRegressors(Nparticles=self.Nparticles) # Compute regressor matrix
         meanZ, covZ = self.mInfer.computeZDistribution(self.Y)
 
+        if Nsamps==0:
+            return None
         if Nsamps==1:
             Zs = meanZ[None,:]
         else:
@@ -244,11 +246,19 @@ class RoundHillModel():
         keep = self.Xtest[:,1]>=0
         if preds is None:
             preds = self.results['testconc']['mean'].copy()
-            preds[preds<0]=0
+            #preds[preds<0]=0
         plt.plot(self.Ytest[keep],preds[keep],'x')
         plt.grid()
-        plt.xlabel('True')
-        plt.ylabel('Pred')
+        plt.xlabel('True / $\mu g/m^3$')
+        plt.ylabel('Prediction / $\mu g/m^3$')
+
+    def compute_RMSE(self,preds=None):
+        keep = self.Xtest[:,1]>=0
+        if preds is None:
+            preds = self.results['testconc']['mean'].copy()
+            #preds[preds<0]=0
+        errs = self.Ytest[keep]-preds[keep]
+        return np.sqrt(np.sum(errs**2))        
         
     def plot_test(self,preds = None,timepoint=600):
         Xtest = self.Xtest
@@ -257,10 +267,11 @@ class RoundHillModel():
         if preds is None:
             preds = self.results['testconc']['mean'].copy()
         plt.scatter(Xtest[keep,2],Xtest[keep,3],Ytest[keep],c='green',alpha=0.5,label='true')
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],preds[keep],alpha=1,c='none',edgecolors='k',label='pred')
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],-preds[keep],alpha=0.2,c='none',edgecolors='b',label='pred')
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],1,c='k')
-        plt.scatter(self.X[:,2],self.X[:,3],1+self.Y/20,c='k')
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],preds[keep],alpha=1,c='none',edgecolors='k',label='prediction')
+        plt.scatter(Xtest[keep,2],Xtest[keep,3],-preds[keep],alpha=0.2,c='none',edgecolors='b',label='prediction')
+        #plt.scatter(Xtest[~keep,2],Xtest[~keep,3],1,facecolor='none',edgecolors='orange',label='training')
+        plt.scatter(self.X[:,2],self.X[:,3],1+self.Y,facecolor='none',edgecolors='orange',label='training')
         plt.plot([0],[0],'o')
         plt.axis('equal')
+        plt.grid()
         plt.legend()                
