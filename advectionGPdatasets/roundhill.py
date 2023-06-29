@@ -1,4 +1,4 @@
-import numpy as np    
+import numpy as np
 import xlrd
 import pandas as pd
 import urllib.request
