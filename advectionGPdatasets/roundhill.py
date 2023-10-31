@@ -160,7 +160,7 @@ from advectionGP.wind import WindSimple
 from advectionGP.models.mfmodels import MeshFreeAdjointAdvectionDiffusionModel as Model
         
 class RoundHillModel():
-    def __init__(self,N_feat=1000,Nparticles=10,k=None,res = [100,60,70],noiseSD=0.01,k_0=1):
+    def __init__(self,N_feat=1000,Nparticles=10,k=None,res = [100,60,70],noiseSD=0.01,k_0=1,holdout=True):
         """
         This class encapsulates the modelling of the roundhill dataset.
         """
@@ -171,7 +171,10 @@ class RoundHillModel():
         self.boundary[0][2]=-30 #puts the source on the grid!
         self.boundary[0][0]=-120 #add two minutes to start
         dist = np.round(self.X[:,2]**2+self.X[:,3]**2).astype(int)
-        self.keep = dist==10000 #2500, 10000, 40000
+        if holdout:
+            self.keep = dist==10000 #2500, 10000, 40000 ##keep are those ones to use for testing
+        else:
+            self.keep = dist==-1 #don't keep any for testing
         self.Xtest = self.X[self.keep,:]
         self.Ytest = self.Y[self.keep]
         self.X = self.X[~self.keep,:]
@@ -229,13 +232,17 @@ class RoundHillModel():
                                                                            coords=coords)
 
         #Compute concentrations at test points
-        self.gridsource = self.mInfer.getGridCoord(np.array([0,0,0])) #location of ground truth source
-        self.gridX = self.mInfer.getGridCoord(self.X[:,1:])/np.array(scaleby) #grid-coords of X (inputs)
-        self.mInferCoords = self.mInfer.coords
-        self.testsensors = FixedSensorModel(self.Xtest,3)
-        particles = self.mInfer.genParticlesFromObservations(50,self.testsensors)
-        meantestconc,vartestconc,testconc = self.mInfer.computeConcentration(
-                    particles=particles,Zs=Zs,interpolateSource=True)
+        if len(self.Xtest)>0:
+            self.gridsource = self.mInfer.getGridCoord(np.array([0,0,0])) #location of ground truth source
+            self.gridX = self.mInfer.getGridCoord(self.X[:,1:])/np.array(scaleby) #grid-coords of X (inputs)
+            self.mInferCoords = self.mInfer.coords
+            self.testsensors = FixedSensorModel(self.Xtest,3)
+            particles = self.mInfer.genParticlesFromObservations(50,self.testsensors)
+            meantestconc,vartestconc,testconc = self.mInfer.computeConcentration(
+                        particles=particles,Zs=Zs,interpolateSource=True)
+        else:
+            print("Skipping computation at test points, as no test points specified")
+            meantestconc,vartestconc,testconc = None,None,None
         self.Zs = Zs
         self.results = {'sources':{'mean':sourcesmean,'var':sourcesvar,'all':sources},
                 'conc':{'mean':concmean,'var':concvar,'all':concentrations},
