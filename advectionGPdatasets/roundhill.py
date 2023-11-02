@@ -160,7 +160,7 @@ from advectionGP.wind import WindSimple
 from advectionGP.models.mfmodels import MeshFreeAdjointAdvectionDiffusionModel as Model
         
 class RoundHillModel():
-    def __init__(self,N_feat=1000,Nparticles=10,k=None,res = [100,60,70],noiseSD=0.01,k_0=1,holdout=True):
+    def __init__(self,N_feat=1000,Nparticles=10,k=None,res = [100,60,70],noiseSD=0.01,k_0=1,holdout=True,walls=None):
         """
         This class encapsulates the modelling of the roundhill dataset.
         """
@@ -206,7 +206,7 @@ class RoundHillModel():
         
         self.mInfer = Model(resolution=self.res,boundary=self.boundary,N_feat=self.N_feat,
                        noiseSD=self.noiseSD,kernel=self.k,sensormodel=self.sensors,
-                       windmodel=self.windmodel,k_0=self.k_0) 
+                       windmodel=self.windmodel,k_0=self.k_0,walls=walls) 
 
     def compute(self,Nsamps=1,scaleby=None):
         """
