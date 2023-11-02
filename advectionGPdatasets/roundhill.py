@@ -166,10 +166,19 @@ class RoundHillModel():
         """
         self.rh = RoundHill()
         self.X = self.rh.experiments[0].X
+        if len(res)==4: #3d
+            self.X = np.c_[self.X,np.ones(len(self.X))] #1m off ground
+        
         self.Y = self.rh.experiments[0].Y #scaling
         self.boundary = proposeboundary(self.X)
         self.boundary[0][2]=-30 #puts the source on the grid!
         self.boundary[0][0]=-120 #add two minutes to start
+        
+        if len(res)==4: #3d
+            self.boundary[0][3]=0
+            self.boundary[1][3]=30 #30m up
+
+        
         dist = np.round(self.X[:,2]**2+self.X[:,3]**2).astype(int)
         if holdout:
             self.keep = dist==10000 #2500, 10000, 40000 ##keep are those ones to use for testing
@@ -182,13 +191,16 @@ class RoundHillModel():
         self.N_feat = N_feat
         self.Nparticles = Nparticles
         if k is None:
-            self.k = EQ(np.array([200,9,9]), 200)
+            if len(res)==3:
+                self.k = EQ(np.array([200,9,9]), 200)
+            if len(res)==4:
+                self.k = EQ(np.array([200,9,9,5]), 200)                
         else:
             self.k = k
         self.res = res
         self.noiseSD = noiseSD
         self.sensors = FixedSensorModel(self.X,3)
-        self.windmodel=WindSimple(self.rh.experiments[0].windX,self.rh.experiments[0].windY)
+        self.windmodel=WindSimple(self.rh.experiments[0].windX,self.rh.experiments[0].windY,None if len(res)==3 else 0)
         self.k_0 = k_0
         
         
@@ -196,11 +208,11 @@ class RoundHillModel():
                        noiseSD=self.noiseSD,kernel=self.k,sensormodel=self.sensors,
                        windmodel=self.windmodel,k_0=self.k_0) 
 
-    def compute(self,Nsamps=1,scaleby=[8,1,1]):
+    def compute(self,Nsamps=1,scaleby=None):
         """
         Compute using the specified model using:
             Nsamps = number of samples [default 1 == the mean of Zs]
-            scaleby = the downscaled resolution of the concentration matrix returned [default [8,1,1]]
+            scaleby = the downscaled resolution of the concentration matrix returned [default [8,1,1] or [8,1,1,2] for 2d and 3d space respectively]
         Returns a dictionary of:
                 sources,
                 conc (Concentration),
@@ -210,6 +222,11 @@ class RoundHillModel():
                 var - of samples
                 all - the raw samples
         """
+        if scaleby is None:
+            if len(self.res)==3: scaleby = [8,1,1]
+            if len(self.res)==4: scaleby = [8,1,1,2]
+
+        assert len(scaleby)==len(self.res)
         self.mInfer.computeModelRegressors(Nparticles=self.Nparticles) # Compute regressor matrix
         meanZ, covZ = self.mInfer.computeZDistribution(self.Y)
 
@@ -221,7 +238,10 @@ class RoundHillModel():
             Zs = np.random.multivariate_normal(meanZ,covZ,Nsamps)
    
         #Compute source grid
-        coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2]].transpose([1,2,3,0])
+        if len(self.res)==3:
+            coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2]].transpose([1,2,3,0])
+        else:
+            coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2],::scaleby[3]].transpose([1,2,3,4,0])
         sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z) for z in Zs])
         sourcesmean = np.mean(sources,0)
         sourcesvar = np.var(sources,0)
