@@ -253,7 +253,7 @@ class RoundHillModel():
 
         #Compute concentrations at test points
         if len(self.Xtest)>0:
-            self.gridsource = self.mInfer.getGridCoord(np.array([0,0,0])) #location of ground truth source
+            self.gridsource = self.mInfer.getGridCoord(np.zeros(len(self.res))) #location of ground truth source
             self.gridX = self.mInfer.getGridCoord(self.X[:,1:])/np.array(scaleby) #grid-coords of X (inputs)
             self.mInferCoords = self.mInfer.coords
             self.testsensors = FixedSensorModel(self.Xtest,3)
