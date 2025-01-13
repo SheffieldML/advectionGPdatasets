@@ -292,7 +292,8 @@ class RoundHillModel():
             preds = self.results['testconc']['mean'].copy()
             #preds[preds<0]=0
         errs = self.Ytest[keep]-preds[keep]
-        return np.sqrt(np.sum(errs**2))        
+        #return np.sqrt(np.sum(errs**2)) #RSSE
+        return np.sqrt(np.mean(errs**2)) #RMSE
         
     def plot_test(self,preds = None,timepoint=600):
         Xtest = self.Xtest
