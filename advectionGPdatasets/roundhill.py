@@ -253,6 +253,7 @@ class RoundHillModel():
         sourcesmean = np.mean(sources,0)
         sourcesvar = np.var(sources,0)
 
+        print("Computing concentrations...")
         #compute concentration grid
         concmean,concvar,concentrations = self.mInfer.computeConcentration(Nparticles=self.Nparticles,
                                                                            Zs=Zs,interpolateSource=True,
@@ -260,6 +261,7 @@ class RoundHillModel():
 
         #Compute concentrations at test points
         if len(self.Xtest)>0:
+            print("Computing concentrations at test points")
             self.gridsource = self.mInfer.getGridCoord(np.zeros(len(self.res))) #location of ground truth source
             self.gridX = self.mInfer.getGridCoord(self.X[:,1:])/np.array(scaleby) #grid-coords of X (inputs)
             self.mInferCoords = self.mInfer.coords
