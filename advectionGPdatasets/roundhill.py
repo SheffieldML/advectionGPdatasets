@@ -208,9 +208,12 @@ class RoundHillModel():
                        noiseSD=self.noiseSD,kernel=self.k,sensormodel=self.sensors,
                        windmodel=self.windmodel,k_0=self.k_0,walls=walls) 
 
-    def compute(self,Nsamps=1,scaleby=None):
+    def compute(self,Nsamps=1,scaleby=None,Zs=None):
         """
-        Compute using the specified model using:
+        Compute using the specified model.
+        If Zs is set, skip computation.
+        
+        Using:
             Nsamps = number of samples [default 1 == the mean of Zs]
             scaleby = the downscaled resolution of the concentration matrix returned [default [8,1,1] or [8,1,1,2] for 2d and 3d space respectively]
         Returns a dictionary of:
@@ -221,28 +224,32 @@ class RoundHillModel():
                 mean - of samples
                 var - of samples
                 all - the raw samples
-        """
+        """       
         if scaleby is None:
             if len(self.res)==3: scaleby = [8,1,1]
             if len(self.res)==4: scaleby = [8,1,1,2]
 
         assert len(scaleby)==len(self.res)
-        self.mInfer.computeModelRegressors(Nparticles=self.Nparticles) # Compute regressor matrix
-        meanZ, covZ = self.mInfer.computeZDistribution(self.Y)
+        
+        if Zs is None:
+            self.mInfer.computeModelRegressors(Nparticles=self.Nparticles) # Compute regressor matrix
+            meanZ, covZ = self.mInfer.computeZDistribution(self.Y)
 
-        if Nsamps==0:
-            return None
-        if Nsamps==1:
-            Zs = meanZ[None,:]
-        else:
-            Zs = np.random.multivariate_normal(meanZ,covZ,Nsamps)
-   
+            if Nsamps==0:
+                return None
+            if Nsamps==1:
+                Zs = meanZ[None,:]
+            else:
+                Zs = np.random.multivariate_normal(meanZ,covZ,Nsamps)
+       
         #Compute source grid
         if len(self.res)==3:
             coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2]].transpose([1,2,3,0])
         else:
             coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2],::scaleby[3]].transpose([1,2,3,4,0])
-        sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z) for z in Zs])
+        print("Computing Sources over grid of coords, shape:")
+        print(coords.shape)
+        sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z,coords) for z in Zs])
         sourcesmean = np.mean(sources,0)
         sourcesvar = np.var(sources,0)
 
@@ -276,8 +283,8 @@ class RoundHillModel():
             #preds[preds<0]=0
         plt.plot(self.Ytest[keep],preds[keep],'x')
         plt.grid()
-        plt.xlabel('True / $\mu g/m^3$')
-        plt.ylabel('Prediction / $\mu g/m^3$')
+        plt.xlabel('True / $\\mu g/m^3$')
+        plt.ylabel('Prediction / $\\mu g/m^3$')
 
     def compute_RMSE(self,preds=None):
         keep = self.Xtest[:,1]>=0
