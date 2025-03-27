@@ -208,7 +208,7 @@ class RoundHillModel():
                        noiseSD=self.noiseSD,kernel=self.k,sensormodel=self.sensors,
                        windmodel=self.windmodel,k_0=self.k_0,walls=walls) 
 
-    def compute(self,Nsamps=1,scaleby=None,Zs=None):
+    def compute(self,Nsamps=1,scaleby=None,Zs=None,interpolatesources=True):
         """
         Compute using the specified model.
         If Zs is set, skip computation.
@@ -249,10 +249,24 @@ class RoundHillModel():
             coords = self.mInfer.coords[:,::scaleby[0],::scaleby[1],::scaleby[2],::scaleby[3]].transpose([1,2,3,4,0])
         print("Computing Sources over grid of coords, shape:")
         print(coords.shape)
-        sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z,coords) for z in Zs])
+        
+
+        if interpolatesources:
+            sources = np.array([self.mInfer.computeSourceFromPhiInterpolated(z,coords) for z in Zs]) #ORIGINAL
+        else:
+            sources = np.array([self.mInfer.computeSourceFromPhi(z,coords.transpose([len(coords.shape)-1]+list(range(len(coords.shape)))[:-1])) for z in Zs])        
+        #NEW        
+        #sources = np.array([self.mInfer.computeSourceFromPhi(z,coords) for z in Zs])        
+        #sources = np.array([self.mInfer.computeSourceFromPhi(z,coords.transpose([len(coords.shape)-1]+list(range(len(coords.shape)))[:-1])) for z in Zs])
+            
         sourcesmean = np.mean(sources,0)
         sourcesvar = np.var(sources,0)
-
+        
+        #temp early return
+        #self.Zs = Zs
+        #self.results = {'sources':{'mean':sourcesmean,'var':sourcesvar,'all':sources}}
+        #return self.results
+        
         print("Computing concentrations...")
         #compute concentration grid
         concmean,concvar,concentrations = self.mInfer.computeConcentration(Nparticles=self.Nparticles,
@@ -278,15 +292,17 @@ class RoundHillModel():
                 'testconc':{'mean':meantestconc,'var':vartestconc,'all':testconc}}
         return self.results
 
-    def scatter_plot_test(self,preds=None):
+    def scatter_plot_test(self,ax=None,preds=None):
+        if ax is None:
+            ax = plt.gca()
         keep = self.Xtest[:,1]>=0
         if preds is None:
             preds = self.results['testconc']['mean'].copy()
             #preds[preds<0]=0
-        plt.plot(self.Ytest[keep],preds[keep],'x')
-        plt.grid()
-        plt.xlabel('True / $\\mu g/m^3$')
-        plt.ylabel('Prediction / $\\mu g/m^3$')
+        ax.plot(self.Ytest[keep],preds[keep],'x')
+        ax.grid()
+        ax.xlabel('True / $\\mu g/m^3$')
+        ax.ylabel('Prediction / $\\mu g/m^3$')
 
     def compute_RMSE(self,preds=None):
         keep = self.Xtest[:,1]>=0
@@ -297,18 +313,38 @@ class RoundHillModel():
         #return np.sqrt(np.sum(errs**2)) #RSSE
         return np.sqrt(np.mean(errs**2)) #RMSE
         
-    def plot_test(self,preds = None,timepoint=600):
-        Xtest = self.Xtest
-        Ytest = self.Ytest
-        keep = Xtest[:,1]==timepoint
+    def plot_test(self,ax=None,preds = None,timepoint=600,getGridCoordMethod=None,legend=False):
+        Xtest = self.Xtest.copy()
+        Ytest = self.Ytest.copy()
+        keep = Xtest[:,1]==timepoint        
+        X = self.X
+        Xtest = Xtest[:,1:]
+        X = X[:,1:]
+        if getGridCoordMethod is not None:
+            Xtest = getGridCoordMethod(Xtest)
+            X = getGridCoordMethod(X)
+            
+
+        if ax is None:
+            ax = plt.gca()        
         if preds is None:
             preds = self.results['testconc']['mean'].copy()
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],Ytest[keep],c='green',alpha=0.5,label='true')
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],preds[keep],alpha=1,c='none',edgecolors='k',label='prediction')
-        plt.scatter(Xtest[keep,2],Xtest[keep,3],-preds[keep],alpha=0.2,c='none',edgecolors='b',label='prediction')
-        #plt.scatter(Xtest[~keep,2],Xtest[~keep,3],1,facecolor='none',edgecolors='orange',label='training')
-        plt.scatter(self.X[:,2],self.X[:,3],1+self.Y,facecolor='none',edgecolors='orange',label='training')
-        plt.plot([0],[0],'o')
-        plt.axis('equal')
-        plt.grid()
-        plt.legend()                
+        ax.scatter(Xtest[keep,1],Xtest[keep,2],Ytest[keep],c='green',alpha=0.5,label='true')
+        ax.scatter(Xtest[keep,1],Xtest[keep,2],preds[keep],alpha=1,c='none',edgecolors='k',label='+ve pred.')
+        ax.scatter(Xtest[keep,1],Xtest[keep,2],-preds[keep],alpha=0.2,c='none',edgecolors='b',label='-ve pred.')
+        #ax.scatter(10000000,10000000,5,alpha=1,c='none',edgecolors='k',label='prediction')        
+        #ax.scatter(10000000,10000000,5,alpha=0.2,c='none',edgecolors='b',label='')
+        #ax.set_xbound(np.min(Xtest[keep,1]),np.max(Xtest[keep,1]))
+        #ax.set_ybound(np.min(Xtest[keep,2]),np.max(Xtest[keep,2]))
+        
+        #plt.scatter(Xtest[~keep,1],Xtest[~keep,2],1,facecolor='none',edgecolors='orange',label='training')
+        ax.scatter(X[:,1],X[:,2],1+self.Y,facecolor='none',edgecolors='orange',label='training')
+        ##ax.plot([0],[0],'o')
+        #ax.axis('equal')
+        ax.grid()
+        if legend:
+            lgnd = ax.legend()                
+            lgnd.legendHandles[0]._sizes = [30]
+            lgnd.legendHandles[1]._sizes = [30]
+            lgnd.legendHandles[2]._sizes = [30]
+            lgnd.legendHandles[3]._sizes = [30]
